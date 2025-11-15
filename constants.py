@@ -135,3 +135,4 @@ RLM = '\u200F'
 PUNCTUATION_CHARS = [
     ",", ".", "\"", "\\", "-", ":", ";", "(", ")", "!", "?", "+", "/"
 ]
+COMMANDER_EXCEL_OUTPUT_PATH = "output/excel/"

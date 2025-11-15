@@ -7,7 +7,7 @@ import docx.text.paragraph
 from docx.shared import Inches, Pt, RGBColor
 from typing import Dict, Union
 from docxtpl import DocxTemplate
-
+import os
 from constants import *
 
 
@@ -217,6 +217,29 @@ def generate_and_fill_commander_docx(df, placeholder_to_value, commander, templa
     # : Use DocxTemplate (another library) to open the processed file and add bullet lists
     add_bullet_lists(DocxTemplate(output_path + commander + ".docx"), df[df[COMMANDER_COLUMN] == commander], commander)
 
+def generate_and_fill_commander_docx(df: pd.DataFrame,
+                                     placeholder_to_value: dict,
+                                     commander: str,
+                                     template_path: str = TEMPLATE_PATH,
+                                     output_path: str = OUTPUT_PATH):
+    # First use python docx to replace placeholders and save
+    doc = Document(template_path)
+    replace_placeholders(doc, placeholder_to_value)
+    doc.save(output_path + commander + ".docx")
+
+    df_commander = df[df[COMMANDER_COLUMN] == commander]
+    tpl = DocxTemplate(output_path + commander + ".docx")
+    add_bullet_lists(tpl, df_commander, commander)
+
+    #cretes ecxel
+    context = merge_bullet_lists(df_commander, commander)
+
+    export_commander_excel(
+        commander=commander,
+        placeholder_to_value=placeholder_to_value,
+        context=context,
+    )
+
 
 def replace_placeholders_in_paragraph(paragraph: docx.text.paragraph.Paragraph, values: Dict):
     text_runs = [run for run in paragraph.runs if run.text]
@@ -329,16 +352,103 @@ def build_bullet_lists_context(df_commander: pd.DataFrame) -> Dict:
     return context
 
 
-def add_bullet_lists(doc: DocxTemplate, df_commander: pd.DataFrame, commander: str):
+def merge_bullet_lists(df_commander: pd.DataFrame, commander: str):
     basic_info = build_basic_info_context(df_commander, commander)
     bullet_lists = build_bullet_lists_context(df_commander)
     context = {
         **basic_info,
         **bullet_lists
     }
-
+    return context
+def add_bullet_lists(doc: DocxTemplate, df_commander: pd.DataFrame, commander: str):
+    context = merge_bullet_lists(df_commander,commander)
     doc.render(context)
     doc.save(OUTPUT_PATH + commander + ".docx")
+
+def build_commander_summary_row(commander: str,
+                                placeholder_to_value: dict,
+                                context: dict) -> dict:
+    row = {
+        "name": context.get("name", commander),
+        "number_answers": context.get("number_answers", None),
+    }
+
+    for key, value in placeholder_to_value.items():
+        if isinstance(value, (list, dict)):
+            continue
+        row[key] = value
+
+    return row
+
+def build_commander_comments_rows_from_context(commander: str,
+                                               context: dict) -> list[dict]:
+    rows: list[dict] = []
+
+    for key, column_name in BULLET_LIST_CONTEXT.items():
+        entry = context.get(key, {})
+        points = entry.get("points", []) if isinstance(entry, dict) else []
+
+        for text in points:
+            rows.append({
+                "category_hebrew": column_name,
+                "comment": text,
+            })
+
+    return rows
+
+def build_summary_header_mapping() -> dict:
+    header_map: dict[str, str] = {
+        "name": "Commander Name",
+        "number_answers": "Number of Respondents",
+        "average_general": "General Rating – Commander Average",
+        "std_general": "General Rating – Standard Deviation",
+        "total_general": "General Rating – Cohort Average",
+    }
+
+    for opt_key, (percent_ph, total_ph) in OPTIONS_TO_PLACEHOLDERS.items():
+        if opt_key.startswith(NONE_OF_THE_ABOVE_OPTION):
+            idx = int(opt_key.split("_")[-1])
+        else:
+            idx = OPTIONS.index(opt_key)
+
+        question = MULTIPLE_CHOICE_COLUMNS[idx // 5]
+
+        if opt_key.startswith(NONE_OF_THE_ABOVE_OPTION):
+            option_text = NONE_OF_THE_ABOVE_OPTION
+        else:
+            option_text = opt_key
+
+        header_map[percent_ph] = f"{question} – {option_text} (% Commander)"
+        header_map[total_ph] = f"{question} – {option_text} (% Cohort)"
+
+    return header_map
+
+def export_commander_excel(commander: str,
+                           placeholder_to_value: dict,
+                           context: dict,
+                           base_path: str | None = None):
+    if base_path is None:
+        base_path = COMMANDER_EXCEL_OUTPUT_PATH
+
+    os.makedirs(base_path, exist_ok=True)
+    excel_path = os.path.join(base_path, f"{commander}.xlsx")
+
+    summary_row = build_commander_summary_row(commander, placeholder_to_value, context)
+    comments_rows = build_commander_comments_rows_from_context(commander, context)
+
+    summary_df = pd.DataFrame([summary_row])
+    comments_df = pd.DataFrame(comments_rows)
+
+    header_map = build_summary_header_mapping()
+    summary_df = summary_df.rename(columns=header_map)
+
+    with pd.ExcelWriter(excel_path) as writer:
+        summary_df.to_excel(writer, sheet_name="Summary", index=False)
+        comments_df.to_excel(writer, sheet_name="Comments", index=False)
+
+    print(f"Excel for commander {commander} written to: {excel_path}")
+
+
 
 def main(file_path=INPUT_PATH):
     if not validate_excel():
