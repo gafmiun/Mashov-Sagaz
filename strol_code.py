@@ -8,12 +8,13 @@ from docx.shared import Inches, Pt, RGBColor
 from typing import Dict, Union
 from docxtpl import DocxTemplate
 
-
 from constants import *
 
 
-def validate_excel(file_path=INPUT_PATH):
 
+
+
+def validate_excel(file_path=INPUT_PATH) -> bool:
     try:
         df = excel_to_dataframe(file_path)
     except Exception as e:
@@ -21,19 +22,109 @@ def validate_excel(file_path=INPUT_PATH):
         return False
 
     actual_columns = list(df.columns)
-
     column_match = set(actual_columns) == set(COLUMNS)
-
-    empty_cells = df.isnull().values.any()
 
     if not column_match:
         print(f"❌ Column names do not match expected names.\nExpected: {COLUMNS}\nActual: {actual_columns}")
+        return False
 
-    return column_match and not empty_cells
+    if df.empty:
+        print("❌ Excel file is empty.")
+        return False
+
+    # Empty cells are allowed
+    return True
+
 
 
 def excel_to_dataframe(file_path=INPUT_PATH):
     return pd.read_excel(file_path)
+
+def format_number(x: float):
+    """
+    If x is an integer
+    Otherwise return rounded float with decimals
+    """
+    if x is None:
+        return DEFAULT_ZERO_VALUE
+
+    if float(x).is_integer():
+        return int(x)
+    rounded =  round(float(x), PERCENT_DECIMALS)
+    return rounded
+def compute_percent(count: int, total: int) -> float:
+    """
+    Returns count/total * 100, rounded to PERCENT_DECIMALS .
+    """
+    if total <= 0:
+        return DEFAULT_ZERO_VALUE
+    value = (count / total) * 100
+    form_value = format_number(value)
+    return f"{form_value}%"
+
+def compute_mahzor_general_average(df: pd.DataFrame) -> float:
+    """
+    Computes the overall (mahzor) average of:
+        'עד כמה הייתי רוצה להיות תחת פיקודו בעתיד?'
+    """
+    col = GENERAL_QUESTION_COLUMN
+
+    raw = df[col]
+    cleaned = raw.replace(r'^\s*$', pd.NA, regex=True)
+    numeric = pd.to_numeric(cleaned, errors="coerce")
+    series = numeric.dropna()
+
+    if series.empty:
+        return DEFAULT_ZERO_VALUE
+
+    return round(float(series.mean()), 2)
+
+def compute_commander_general_stats(df_filtered: pd.DataFrame) -> Dict:
+    """
+    Computes per-commander stats for:
+        'עד כמה הייתי רוצה להיות תחת פיקודו בעתיד?'
+    """
+    col = "עד כמה הייתי רוצה להיות תחת פיקודו בעתיד?"
+
+    raw = df_filtered[col]
+
+    # Treat empty/whitespace as missing
+    cleaned = raw.replace(r'^\s*$', pd.NA, regex=True)
+
+    # Convert to numeric, invalid -> NaN, then drop NaN
+    numeric = pd.to_numeric(cleaned, errors="coerce")
+    series = numeric.dropna()
+
+    n_valid = len(series)
+
+    stats = {}
+    if n_valid < MIN_GENERAL_ANSWERS:
+        stats["average_general"] = TOO_FEW_ANSWERS_TEXT
+        stats["std_general"] = TOO_FEW_ANSWERS_TEXT
+        return stats
+
+    mean_val = series.mean()
+    std_val = series.std(ddof=1)
+
+    if pd.isna(std_val):
+        std_val = DEFAULT_ZERO_VALUE
+
+    stats["average_general"] = round(float(mean_val), 2)
+    stats["std_general"] = round(float(std_val), 2)
+
+    return stats
+
+
+def add_general_question_stats(df_all: pd.DataFrame,
+                               df_filtered: pd.DataFrame,
+                               placeholder_to_value: Dict):
+
+    commander_stats = compute_commander_general_stats(df_filtered)
+    mahzor_avg = compute_mahzor_general_average(df_all)
+    placeholder_to_value.update(commander_stats)
+    placeholder_to_value["total_general"] = mahzor_avg
+
+
 
 
 def calculations_on_seperated_data(df: pd.DataFrame, commander):
@@ -42,15 +133,17 @@ def calculations_on_seperated_data(df: pd.DataFrame, commander):
     df_filtered = df[df[COMMANDER_COLUMN] == commander]
 
     for option in OPTIONS:
-        if option is not NONE_OF_THE_ABOVE_OPTION:
+        if option != NONE_OF_THE_ABOVE_OPTION:
             count = count_occurrences(df_filtered, option)
-            placeholder_to_value[OPTIONS_TO_PLACEHOLDERS[option]] = count / len(df_filtered)
-
+            percent_ph, _ = OPTIONS_TO_PLACEHOLDERS[option]  # split the tuple
+            placeholder_to_value[percent_ph] = compute_percent(count,len(df_filtered))
     # I handle it differently as it appears in all of the questions
     handle_none_of_the_above(df_filtered, placeholder_to_value)
 
     for column in OPEN_QUESTIONS_COLUMNS:
         placeholder_to_value[column] = [str(item) for item in df_filtered[column].dropna().tolist()]
+
+    add_general_question_stats(df, df_filtered, placeholder_to_value)
 
     return placeholder_to_value
 
@@ -58,37 +151,32 @@ def calculations_on_seperated_data(df: pd.DataFrame, commander):
 def handle_none_of_the_above(df_filtered: pd.DataFrame, placeholder_to_value: Dict):
     for index, col in enumerate(MULTIPLE_CHOICE_COLUMNS):
         count = count_occurrences(df_filtered[col], NONE_OF_THE_ABOVE_OPTION)
-        placeholder_to_value[OPTIONS_TO_PLACEHOLDERS[NONE_OF_THE_ABOVE_OPTION + f"_{index}"]] = count / len(df_filtered)
+        percent_ph, _ = OPTIONS_TO_PLACEHOLDERS[NONE_OF_THE_ABOVE_OPTION + f"_{index}"]
+        placeholder_to_value[percent_ph] = compute_percent(count,len(df_filtered))
+
 
 
 def calculate_total_percentage(df: pd.DataFrame):
     mahzor_averages = {}
 
     for option in OPTIONS:
-        if option is not NONE_OF_THE_ABOVE_OPTION:
-            mahzor_averages[OPTIONS_TO_PLACEHOLDERS[option]] = count_occurrences(df, option) / len(df) * 100
+        if option != NONE_OF_THE_ABOVE_OPTION:
+            _, total_ph = OPTIONS_TO_PLACEHOLDERS[option]  # split the tuple
+            count = count_occurrences(df, option)
+            mahzor_averages[total_ph] = compute_percent(count,len(df))
 
-    # I handle it differently as it appears in all of the questions
+    # "none of the above" per question
     for index, col in enumerate(MULTIPLE_CHOICE_COLUMNS):
+        _, total_ph = OPTIONS_TO_PLACEHOLDERS[NONE_OF_THE_ABOVE_OPTION + f"_{index}"]
         count = count_occurrences(df[col], NONE_OF_THE_ABOVE_OPTION)
-        mahzor_averages[OPTIONS_TO_PLACEHOLDERS[NONE_OF_THE_ABOVE_OPTION + f"_{index}"]] = count / len(df) * 100
+        mahzor_averages[total_ph] = compute_percent(count,len(df))
 
     return mahzor_averages
 
 
-def count_occurrences(data: Union[pd.DataFrame, pd.Series], target: str, separator: str = ",") -> int:
-    """
-    Count how many times a given string appears anywhere in a DataFrame.
 
-    Args:
-        df (pd.DataFrame): The DataFrame to search.
-        target (str): The string to count.
-        separator (str): The separator used for multiple strings in a cell (default: ',').
+def count_occurrences(data: Union[pd.DataFrame, pd.Series], target: str) -> int:
 
-    Returns:
-        int: Total number of times the string appears across the entire DataFrame.
-    """
-    count = 0
     if isinstance(data, pd.DataFrame):
         iterator = (cell for col in data.columns for cell in data[col])
     elif isinstance(data, pd.Series):
@@ -96,11 +184,15 @@ def count_occurrences(data: Union[pd.DataFrame, pd.Series], target: str, separat
     else:
         raise TypeError("data must be a pandas DataFrame or Series")
 
+    count = 0
     for cell in iterator:
-        if isinstance(cell, str):
-            values = [v.strip() for v in cell.split(separator) if v.strip() != ""]
-            # count every match (so duplicates in same cell count multiple times)
-            count += sum(1 for v in values if v == target)
+        if not isinstance(cell, str):
+            continue
+
+        text = cell.strip()
+
+        if target in text:
+            count += 1
 
     return count
 
@@ -113,28 +205,43 @@ def validate_calculations(placeholder_to_value: Dict):
     return True
 
 
-def generate_and_fill_commander_docx(df, placeholder_to_value, commander, template_path=TEMPLATE_PATH, output_path=OUTPUT_PATH):
+def generate_and_fill_commander_docx(df, placeholder_to_value, commander, template_path=TEMPLATE_PATH,
+                                     output_path=OUTPUT_PATH):
+    # First use python docx to replace placeholders and save
     doc = Document(template_path)
 
     replace_placeholders(doc, placeholder_to_value)
 
-    add_bullet_lists(DocxTemplate(TEMPLATE_PATH), df[df[COMMANDER_COLUMN] == commander], commander)
-
     doc.save(output_path + commander + ".docx")
+
+    # : Use DocxTemplate (another library) to open the processed file and add bullet lists
+    add_bullet_lists(DocxTemplate(output_path + commander + ".docx"), df[df[COMMANDER_COLUMN] == commander], commander)
 
 
 def replace_placeholders_in_paragraph(paragraph: docx.text.paragraph.Paragraph, values: Dict):
-    for run in paragraph.runs:
-        for placeholder, value in values.items():
-            print(f"Replacing {placeholder} with {value} at text {run.text}")
-            for p in placeholder:
-                p = "{{" + p + "}}"
+    text_runs = [run for run in paragraph.runs if run.text]
 
-                if str(p) not in run.text:
-                    continue
-                if str(p) in run.text:
-                    run.text = run.text.replace(p, str(value))
-                    print("completed")
+    if not text_runs:
+        return
+
+    original_texts = [run.text for run in text_runs]
+    big_text = "".join(original_texts)
+
+    if "{{" not in big_text:
+        return
+
+    for placeholder, value in values.items():
+        token = "{{" + str(placeholder) + "}}"
+        if token in big_text:
+            big_text = big_text.replace(token, str(value))
+
+    pos = 0
+    for run, old_text in zip(text_runs, original_texts):
+        length = len(old_text)
+        run.text = big_text[pos:pos + length]
+        pos += length
+
+
 
 
 def replace_placeholders_in_table(table: docx.table.Table, values: Dict):
@@ -157,7 +264,6 @@ def replace_placeholders_in_section(section, values: Dict):
             replace_placeholders_in_table(table, values)
 
 
-# TODO: make it work with filling a bullet list
 def replace_placeholders(doc: Document, values: Dict):
     # Body paragraphs
     for paragraph in doc.paragraphs:
@@ -172,15 +278,67 @@ def replace_placeholders(doc: Document, values: Dict):
         replace_placeholders_in_section(section, values)
 
 
-def add_bullet_lists(doc: DocxTemplate, df: pd.DataFrame, commander: str):
+def build_basic_info_context(df_commander: pd.DataFrame, commander: str) -> Dict:
+    answers_num = len(df_commander)
+    return {
+        'name': commander,
+        'number_answers': answers_num,
+    }
+
+
+def rtl_embed(text: str) -> str:
+    "make sure text is in RTL format"
+    if not isinstance(text, str):
+        return text
+
+    text = text.strip()
+    if not text:
+        return text
+
+
+    for ch in PUNCTUATION_CHARS:
+        text = text.replace(ch, f"{RLM}{ch}{RLM}")
+
+    return f"{RLE}{text}{PDF}"
+
+
+def build_bullet_lists_context(df_commander: pd.DataFrame) -> Dict:
+    context: Dict[str, Dict[str, list]] = {}
+
+    for key, column_name in BULLET_LIST_CONTEXT.items():
+        points: list[str] = []
+
+        if column_name in df_commander.columns:
+            series = df_commander[column_name].dropna().astype(str)
+
+            cleaned_points: list[str] = []
+            for raw in series:
+                text = raw.strip()
+
+                #
+                if len(text) < MIN_COMMENT_LENGTH:
+                    continue
+                text = rtl_embed(text)
+
+                cleaned_points.append(text)
+
+            points = cleaned_points
+
+        context[key] = {"points": points}
+
+    return context
+
+
+def add_bullet_lists(doc: DocxTemplate, df_commander: pd.DataFrame, commander: str):
+    basic_info = build_basic_info_context(df_commander, commander)
+    bullet_lists = build_bullet_lists_context(df_commander)
     context = {
-        "improve_command": {"points": df["נקודות חיוביות פיקוד:"]},
-        "conserve_command": {"points": df["נקודות שליליות פיקוד:"]},
+        **basic_info,
+        **bullet_lists
     }
 
     doc.render(context)
-    # doc.save(OUTPUT_PATH + commander + ".docx")
-
+    doc.save(OUTPUT_PATH + commander + ".docx")
 
 def main(file_path=INPUT_PATH):
     if not validate_excel():
@@ -188,6 +346,9 @@ def main(file_path=INPUT_PATH):
         return
 
     df = excel_to_dataframe(file_path)
+    # clen up empty rows / rows without commander name
+    df = df.dropna(how="all")
+    df = df.dropna(subset=[COMMANDER_COLUMN])
 
     mahzor_averages = calculate_total_percentage(df)
 
@@ -201,11 +362,10 @@ def main(file_path=INPUT_PATH):
             print("Calculations validation failed.")
             return
 
-        # TODO: currently the code can only do one (the second one).
 
-        # add_bullet_lists(DocxTemplate(TEMPLATE_PATH), df[df[COMMANDER_COLUMN] == commander], commander)
+
+
         generate_and_fill_commander_docx(df, placeholder_to_value, commander)
-
 
 
 if __name__ == "__main__":

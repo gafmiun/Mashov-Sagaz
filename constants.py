@@ -7,7 +7,7 @@ COLUMNS = ["Timestamp", "שם המפקד:",
 
 INPUT_PATH = "answers.xlsx"
 
-TEMPLATE_PATH = "real_template.docx"
+TEMPLATE_PATH = "new_template2.docx"
 
 OUTPUT_PATH = "output/"
 
@@ -39,14 +39,14 @@ PLACEHOLDERS = [
 
                 ]
 
-OPTIONS = ["החלטי/ת סמכותי/ת ובטוח/ה בעצמו/ה", "מעורר/ת בי מוטיבציה", "מהווה דוגמה אישית", "מייצג/ת בהתנהגותו/ה את ערכי התוכנית", "אף אחד מההיגדים אינו נכון בעיניי",
-           "נוכח/ת במופעי ההכשרה באופן רציף", "מעורב/ת במתרחש בתוכנית", "נגיש/ה וזמינ/ה לשאלות", "עוקב/ת אחרי מצבי בהכשרה", "אף אחד מההיגדים אינו נכון בעיניי",
+OPTIONS = ["החלטי/ת, סמכותי/ת ובטוח/ה בעצמו/ה", "מעורר/ת בי מוטיבציה", "מהווה דוגמה אישית", "מייצג/ת בהתנהגותו/ה את ערכי התוכנית", "אף אחד מההיגדים אינו נכון בעיניי",
+           "נוכח/ת במופעי ההכשרה באופן רציף", "מעורב/ת במתרחש בתוכנית", "נגיש/ה וזמינ/ה לשאלות", "עוקב/ת אחר מצבי בהכשרה", "אף אחד מההיגדים אינו נכון בעיניי",
            "מגלה אכפתיות כלפיי", "מכיר/ה אותי לעומק", "מתייחס/ת בנעימות ובכבוד", "אני מרגיש/ה שאני מסוגל/ת לשתף אותו", "אף אחד מההיגדים אינו נכון בעיניי",
            "נותן/ת משוב ישיר וכנה", "מסייע/ת בעיבוד חוויות והתנסויות בהכשרה", "דואג/ת לפתח ולקדם אותי", "מציב/ה לי סטנדרט גבוה", "אף אחד מההיגדים אינו נכון בעיניי",
            ]
 
 OPTIONS_TO_PLACEHOLDERS = {
-                            "החלטי/ת סמכותי/ת ובטוח/ה בעצמו/ה": ("percent_command_1", "total_command_1"),
+                            "החלטי/ת, סמכותי/ת ובטוח/ה בעצמו/ה": ("percent_command_1", "total_command_1"),
                            "מעורר/ת בי מוטיבציה": ("percent_command_2", "total_command_2"),
                            "מהווה דוגמה אישית": ("percent_command_3", "total_command_3"),
                             "מייצג/ת בהתנהגותו/ה את ערכי התוכנית": ("percent_command_4", "total_command_4"),
@@ -54,7 +54,7 @@ OPTIONS_TO_PLACEHOLDERS = {
                             "נוכח/ת במופעי ההכשרה באופן רציף": ("percent_involvement_1", "total_involvement_1"),
                             "מעורב/ת במתרחש בתוכנית": ("percent_involvement_2", "total_involvement_2"),
                             "נגיש/ה וזמינ/ה לשאלות": ("percent_involvement_3", "total_involvement_3"),
-                            "עוקב/ת אחרי מצבי בהכשרה": ("percent_involvement_4", "total_involvement_4"),
+                            "עוקב/ת אחר מצבי בהכשרה": ("percent_involvement_4", "total_involvement_4"),
                             "אף אחד מההיגדים אינו נכון בעיניי_1": ("percent_involvement_5", "total_involvement_5"),
                             "מגלה אכפתיות כלפיי": ("percent_personal_1", "total_personal_1"),
                             "מכיר/ה אותי לעומק": ("percent_personal_2", "total_personal_2"),
@@ -83,5 +83,55 @@ OPEN_QUESTIONS_COLUMNS = ["נקודות חיוביות פיקוד:", "נקודו
                           "נקודות חיוביות אתגור:", "נקודות שליליות אתגור:",
                           "הערות כלליות:"]
 
-# TODO: create a dict and adjust the code to match them, like it does with the numericals
+
 OPEN_QUESTIONS_PLACEHOLDERS = {}
+
+# Hebrew Excel column → English placeholder name in Word template
+BULLET_LIST_CONTEXT = {
+    # פיקוד (Command)
+    "conserve_command": "נקודות חיוביות פיקוד:",
+    "improve_command":  "נקודות שליליות פיקוד:",
+
+    # נוכחות ומעורבות (Involvement)
+    "conserve_involvement": "נקודות חיוביות נוכחות:",
+    "improve_involvement":  "נקודות שליליות נוכחות:",
+
+    # יחס אישי (Personal)
+    "conserve_personal": "נקודות חיוביות יחס אישי:",
+    "improve_personal":  "נקודות שליליות יחס אישי:",
+
+    # אתגור ופיתוח מקצועי (Challenge)
+    "conserve_challenge": "נקודות חיוביות אתגור:",
+    "improve_challenge":  "נקודות שליליות אתגור:",
+
+    # הערות כלליות (General)
+    "general_comments": "הערות כלליות:",
+}
+
+
+# ===== General constants =====
+
+# Column with the 1–6 general rating
+GENERAL_QUESTION_COLUMN = "עד כמה הייתי רוצה להיות תחת פיקודו בעתיד?"
+
+
+MIN_GENERAL_ANSWERS = 4
+
+
+TOO_FEW_ANSWERS_TEXT = "ענו פחות מ-4"
+
+
+PERCENT_DECIMALS = 2
+
+
+MIN_COMMENT_LENGTH = 2
+
+DEFAULT_ZERO_VALUE = 0.0
+
+RLE = '\u202B'  # Right-to-Left Embedding
+PDF = '\u202C'  # Pop Directional Formatting
+RLM = '\u200F'
+
+PUNCTUATION_CHARS = [
+    ",", ".", "\"", "\\", "-", ":", ";", "(", ")", "!", "?", "+", "/"
+]
