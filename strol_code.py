@@ -117,7 +117,7 @@ def compute_commander_general_stats(df_filtered: pd.DataFrame) -> Dict:
     return stats
 
 
-def add_general_question_comander(df_filtered: pd.DataFrame,
+def add_general_question_commander(df_filtered: pd.DataFrame,
                                   placeholder_to_value: Dict):
     commander_stats = compute_commander_general_stats(df_filtered)
     placeholder_to_value.update(commander_stats)
@@ -128,20 +128,20 @@ def add_general_question_mahzor(df_all: pd.DataFrame,
     mahzor_avg = compute_mahzor_general_average(df_all)
     mahzor_averages["total_general"] = mahzor_avg
 
-def calculations_on_seperated_data(df_comander: pd.DataFrame, commander):
+def calculations_on_seperated_data(df_commander: pd.DataFrame, commander):
     placeholder_to_value = {}
     for option in OPTIONS:
         if option != NONE_OF_THE_ABOVE_OPTION:
-            count = count_occurrences(df_comander, option)
+            count = count_occurrences(df_commander, option)
             percent_ph, _ = OPTIONS_TO_PLACEHOLDERS[option]  # split the tuple
-            placeholder_to_value[percent_ph] = compute_percent(count,len(df_comander))
+            placeholder_to_value[percent_ph] = compute_percent(count, len(df_commander))
     # I handle it differently as it appears in all of the questions
-    handle_none_of_the_above(df_comander, placeholder_to_value)
+    handle_none_of_the_above(df_commander, placeholder_to_value)
 
     for column in OPEN_QUESTIONS_COLUMNS:
-        placeholder_to_value[column] = [str(item) for item in df_comander[column].dropna().tolist()]
+        placeholder_to_value[column] = [str(item) for item in df_commander[column].dropna().tolist()]
 
-    add_general_question_comander(df_comander,placeholder_to_value)
+    add_general_question_commander(df_commander, placeholder_to_value)
 
     return placeholder_to_value
 
@@ -520,7 +520,7 @@ def export_commander_excel(
     print(f"Excel for commander {commander} written to: {excel_path}")
 
 def main(file_path=INPUT_PATH):
-    if not validate_excel():
+    if not validate_excel(file_path):
         print("Excel file validation failed.")
         return
 
