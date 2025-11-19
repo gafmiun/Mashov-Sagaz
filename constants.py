@@ -135,4 +135,24 @@ RLM = '\u200F'
 PUNCTUATION_CHARS = [
     ",", ".", "\"", "\\", "-", ":", ";", "(", ")", "!", "?", "+", "/"
 ]
+# ===== Excel export constants =====
+
 COMMANDER_EXCEL_OUTPUT_PATH = "output/excel/"
+
+SHEET_NAME_QUANTITATIVE = "Quantitative"
+SHEET_NAME_TEXTUAL = "Textual"
+
+OPTIONS_PER_QUESTION = 5
+OPTION_BLOCK_WIDTH = 3
+
+QUANT_HEADER_LABEL_COMMANDER = "Commander"
+QUANT_HEADER_LABEL_NUM_RESPONDENTS = "Number of respondents"
+QUANT_HEADER_LABEL_AVG_GENERAL = "General question – commander average"
+QUANT_HEADER_LABEL_STD_GENERAL = "General question – commander std"
+QUANT_HEADER_LABEL_COHORT_GENERAL = "General question – cohort average"
+
+QUANT_COLUMN_QUESTION = "Question"
+
+QUANT_SUBHEADER_STATEMENT = "Statement"
+QUANT_SUBHEADER_COMMANDER_PERCENT = "Commander %"
+QUANT_SUBHEADER_COHORT_PERCENT = "Cohort %"

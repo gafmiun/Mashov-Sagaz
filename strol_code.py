@@ -8,6 +8,8 @@ from docx.shared import Inches, Pt, RGBColor
 from typing import Dict, Union
 from docxtpl import DocxTemplate
 import os
+from typing import Optional
+
 from constants import *
 
 
@@ -217,29 +219,6 @@ def generate_and_fill_commander_docx(df, placeholder_to_value, commander, templa
     # : Use DocxTemplate (another library) to open the processed file and add bullet lists
     add_bullet_lists(DocxTemplate(output_path + commander + ".docx"), df[df[COMMANDER_COLUMN] == commander], commander)
 
-def generate_and_fill_commander_docx(df: pd.DataFrame,
-                                     placeholder_to_value: dict,
-                                     commander: str,
-                                     template_path: str = TEMPLATE_PATH,
-                                     output_path: str = OUTPUT_PATH):
-    # First use python docx to replace placeholders and save
-    doc = Document(template_path)
-    replace_placeholders(doc, placeholder_to_value)
-    doc.save(output_path + commander + ".docx")
-
-    df_commander = df[df[COMMANDER_COLUMN] == commander]
-    tpl = DocxTemplate(output_path + commander + ".docx")
-    add_bullet_lists(tpl, df_commander, commander)
-
-    #cretes ecxel
-    context = merge_bullet_lists(df_commander, commander)
-
-    export_commander_excel(
-        commander=commander,
-        placeholder_to_value=placeholder_to_value,
-        context=context,
-    )
-
 
 def replace_placeholders_in_paragraph(paragraph: docx.text.paragraph.Paragraph, values: Dict):
     text_runs = [run for run in paragraph.runs if run.text]
@@ -365,88 +344,181 @@ def add_bullet_lists(doc: DocxTemplate, df_commander: pd.DataFrame, commander: s
     doc.render(context)
     doc.save(OUTPUT_PATH + commander + ".docx")
 
-def build_commander_summary_row(commander: str,
-                                placeholder_to_value: dict,
-                                context: dict) -> dict:
-    row = {
-        "name": context.get("name", commander),
-        "number_answers": context.get("number_answers", None),
-    }
 
-    for key, value in placeholder_to_value.items():
-        if isinstance(value, (list, dict)):
-            continue
-        row[key] = value
 
-    return row
+# ==== Excel export
 
-def build_commander_comments_rows_from_context(commander: str,
-                                               context: dict) -> list[dict]:
-    rows: list[dict] = []
+def build_quantitative_sheet(
+    df_commander: pd.DataFrame,
+    placeholder_to_value: Dict,
+    mahzor_averages: Dict
+) -> pd.DataFrame:
+    rows: list[list] = []
 
-    for key, column_name in BULLET_LIST_CONTEXT.items():
-        entry = context.get(key, {})
-        points = entry.get("points", []) if isinstance(entry, dict) else []
+    commander_name = df_commander[COMMANDER_COLUMN].iloc[0]
+    num_answers = len(df_commander)
 
-        for text in points:
-            rows.append({
-                "category_hebrew": column_name,
-                "comment": text,
-            })
+    average_general = placeholder_to_value.get("average_general", "")
+    std_general = placeholder_to_value.get("std_general", "")
+    total_general = placeholder_to_value.get("total_general", "")
 
-    return rows
+    # Top info block
+    rows.append([QUANT_HEADER_LABEL_COMMANDER, commander_name])
+    rows.append([QUANT_HEADER_LABEL_NUM_RESPONDENTS, num_answers])
+    rows.append([QUANT_HEADER_LABEL_AVG_GENERAL, average_general])
+    rows.append([QUANT_HEADER_LABEL_STD_GENERAL, std_general])
+    rows.append([QUANT_HEADER_LABEL_COHORT_GENERAL, total_general])
+    rows.append([])  # separator row
 
-def build_summary_header_mapping() -> dict:
-    header_map: dict[str, str] = {
-        "name": "Commander Name",
-        "number_answers": "Number of Respondents",
-        "average_general": "General Rating – Commander Average",
-        "std_general": "General Rating – Standard Deviation",
-        "total_general": "General Rating – Cohort Average",
-    }
+    # Table header row
+    header: list[str] = [QUANT_COLUMN_QUESTION]
+    for i in range(OPTIONS_PER_QUESTION):
+        header.extend([
+            f"{QUANT_SUBHEADER_STATEMENT} {i + 1}",
+            f"{QUANT_SUBHEADER_COMMANDER_PERCENT} {i + 1}",
+            f"{QUANT_SUBHEADER_COHORT_PERCENT} {i + 1}",
+        ])
+    rows.append(header)
 
-    for opt_key, (percent_ph, total_ph) in OPTIONS_TO_PLACEHOLDERS.items():
-        if opt_key.startswith(NONE_OF_THE_ABOVE_OPTION):
-            idx = int(opt_key.split("_")[-1])
+    total_columns = 1 + OPTIONS_PER_QUESTION * OPTION_BLOCK_WIDTH
+
+    def make_empty_row() -> list:
+        return [""] * total_columns
+
+    # One row per question, options spread across columns
+    for question_index, question in enumerate(MULTIPLE_CHOICE_COLUMNS):
+        row = make_empty_row()
+        row[0] = question
+
+        start = question_index * OPTIONS_PER_QUESTION
+        end = start + OPTIONS_PER_QUESTION
+        options_for_question = OPTIONS[start:end]
+
+        for option_offset, option_text in enumerate(options_for_question):
+            base_col = 1 + option_offset * OPTION_BLOCK_WIDTH
+
+            row[base_col] = option_text
+
+            if option_text == NONE_OF_THE_ABOVE_OPTION:
+                option_key = f"{NONE_OF_THE_ABOVE_OPTION}_{question_index}"
+            else:
+                option_key = option_text
+
+            percent_placeholder, total_placeholder = OPTIONS_TO_PLACEHOLDERS[option_key]
+
+            commander_percent = placeholder_to_value.get(percent_placeholder, "")
+            cohort_percent = mahzor_averages.get(total_placeholder, "")
+
+            row[base_col + 1] = commander_percent
+            row[base_col + 2] = cohort_percent
+
+        rows.append(row)
+        rows.append(make_empty_row())  # blank row between questions
+
+    df_quantitative = pd.DataFrame(rows)
+    return df_quantitative
+
+
+    def make_empty_row() -> list:
+        return [""] * total_columns
+
+    # For each question, fill rows with its options
+    for question_index, question in enumerate(MULTIPLE_CHOICE_COLUMNS):
+        start = question_index * OPTIONS_PER_QUESTION
+        end = start + OPTIONS_PER_QUESTION
+        options_for_question = OPTIONS[start:end]
+
+        for option_text in options_for_question:
+            row = make_empty_row()
+            base_col = question_index * QUESTION_BLOCK_WIDTH
+
+            # Statement text
+            row[base_col] = option_text
+
+            # Determine mapping key for this option
+            if option_text == NONE_OF_THE_ABOVE_OPTION:
+                option_key = f"{NONE_OF_THE_ABOVE_OPTION}_{question_index}"
+            else:
+                option_key = option_text
+
+            percent_placeholder, total_placeholder = OPTIONS_TO_PLACEHOLDERS[option_key]
+
+            commander_percent = placeholder_to_value.get(percent_placeholder, "")
+            cohort_percent = mahzor_averages.get(total_placeholder, "")
+
+            row[base_col + 1] = commander_percent
+            row[base_col + 2] = cohort_percent
+
+            rows.append(row)
+
+    df_quantitative = pd.DataFrame(rows)
+    return df_quantitative
+
+def build_textual_sheet(df_commander: pd.DataFrame) -> pd.DataFrame:
+    column_to_answers: Dict[str, list[str]] = {}
+    max_len = 0
+
+    for question in OPEN_QUESTIONS_COLUMNS:
+        if question in df_commander.columns:
+            series = df_commander[question].dropna().astype(str)
+            answers: list[str] = []
+
+            for raw in series:
+                text = raw.strip()
+                if len(text) < MIN_COMMENT_LENGTH:
+                    continue
+                answers.append(text)
         else:
-            idx = OPTIONS.index(opt_key)
+            answers = []
 
-        question = MULTIPLE_CHOICE_COLUMNS[idx // 5]
+        column_to_answers[question] = answers
+        if len(answers) > max_len:
+            max_len = len(answers)
 
-        if opt_key.startswith(NONE_OF_THE_ABOVE_OPTION):
-            option_text = NONE_OF_THE_ABOVE_OPTION
-        else:
-            option_text = opt_key
+    data: Dict[str, list[str]] = {}
+    for question, answers in column_to_answers.items():
+        padded = answers + [""] * (max_len - len(answers))
+        data[question] = padded
 
-        header_map[percent_ph] = f"{question} – {option_text} (% Commander)"
-        header_map[total_ph] = f"{question} – {option_text} (% Cohort)"
+    df_textual = pd.DataFrame(data)
+    return df_textual
 
-    return header_map
+def export_commander_excel(
+    df_commander: pd.DataFrame,
+    commander: str,
+    placeholder_to_value: Dict,
+    mahzor_averages: Dict,
+    base_path: Optional[str] = None
+) -> None:
+    output_base = base_path if base_path is not None else COMMANDER_EXCEL_OUTPUT_PATH
 
-def export_commander_excel(commander: str,
-                           placeholder_to_value: dict,
-                           context: dict,
-                           base_path: str | None = None):
-    if base_path is None:
-        base_path = COMMANDER_EXCEL_OUTPUT_PATH
+    os.makedirs(output_base, exist_ok=True)
 
-    os.makedirs(base_path, exist_ok=True)
-    excel_path = os.path.join(base_path, f"{commander}.xlsx")
+    excel_path = os.path.join(output_base, f"{commander}.xlsx")
 
-    summary_row = build_commander_summary_row(commander, placeholder_to_value, context)
-    comments_rows = build_commander_comments_rows_from_context(commander, context)
+    df_quantitative = build_quantitative_sheet(
+        df_commander=df_commander,
+        placeholder_to_value=placeholder_to_value,
+        mahzor_averages=mahzor_averages,
+    )
 
-    summary_df = pd.DataFrame([summary_row])
-    comments_df = pd.DataFrame(comments_rows)
-
-    header_map = build_summary_header_mapping()
-    summary_df = summary_df.rename(columns=header_map)
+    df_textual = build_textual_sheet(df_commander=df_commander)
 
     with pd.ExcelWriter(excel_path) as writer:
-        summary_df.to_excel(writer, sheet_name="Summary", index=False)
-        comments_df.to_excel(writer, sheet_name="Comments", index=False)
+        df_quantitative.to_excel(
+            writer,
+            sheet_name=SHEET_NAME_QUANTITATIVE,
+            index=False,
+            header=False
+        )
+        df_textual.to_excel(
+            writer,
+            sheet_name=SHEET_NAME_TEXTUAL,
+            index=False
+        )
 
     print(f"Excel for commander {commander} written to: {excel_path}")
+
 
 
 
@@ -463,7 +535,7 @@ def main(file_path=INPUT_PATH):
     mahzor_averages = calculate_total_percentage(df)
 
     for commander in df[COMMANDER_COLUMN].unique():
-
+        df_commander = df[df[COMMANDER_COLUMN] == commander]
         placeholder_to_value = calculations_on_seperated_data(df, commander)
         # merge with mahzor averages
         placeholder_to_value.update(mahzor_averages)
@@ -472,11 +544,14 @@ def main(file_path=INPUT_PATH):
             print("Calculations validation failed.")
             return
 
-
-
-
         generate_and_fill_commander_docx(df, placeholder_to_value, commander)
 
+        export_commander_excel(
+            df_commander=df_commander,
+            commander=commander,
+            placeholder_to_value=placeholder_to_value,
+            mahzor_averages=mahzor_averages,
+        )
 
 if __name__ == "__main__":
     main(INPUT_PATH)
