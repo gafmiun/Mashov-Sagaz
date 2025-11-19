@@ -109,6 +109,39 @@ BULLET_LIST_CONTEXT = {
 }
 
 
+# Mapping from question text (Hebrew, as in the Excel) to its 5 options
+QUESTION_TO_OPTIONS = {
+    "מה נכון בפיקוד?": [
+        "החלטי/ת, סמכותי/ת ובטוח/ה בעצמו/ה",
+        "מעורר/ת בי מוטיבציה",
+        "מהווה דוגמה אישית",
+        "מייצג/ת בהתנהגותו/ה את ערכי התוכנית",
+        NONE_OF_THE_ABOVE_OPTION,
+    ],
+    "מה נכון בנוכחות ומעורבות?": [
+        "נוכח/ת במופעי ההכשרה באופן רציף",
+        "מעורב/ת במתרחש בתוכנית",
+        "נגיש/ה וזמינ/ה לשאלות",
+        "עוקב/ת אחר מצבי בהכשרה",
+        NONE_OF_THE_ABOVE_OPTION,
+    ],
+    "מה נכון ביחס אישי?": [
+        "מגלה אכפתיות כלפיי",
+        "מכיר/ה אותי לעומק",
+        "מתייחס/ת בנעימות ובכבוד",
+        "אני מרגיש/ה שאני מסוגל/ת לשתף אותו",
+        NONE_OF_THE_ABOVE_OPTION,
+    ],
+    "מה נכון באתגור ופיתוח מקצועי?": [
+        "נותן/ת משוב ישיר וכנה",
+        "מסייע/ת בעיבוד חוויות והתנסויות בהכשרה",
+        "דואג/ת לפתח ולקדם אותי",
+        "מציב/ה לי סטנדרט גבוה",
+        NONE_OF_THE_ABOVE_OPTION,
+    ],
+}
+
+
 # ===== General constants =====
 
 # Column with the 1–6 general rating
@@ -137,6 +170,8 @@ PUNCTUATION_CHARS = [
 ]
 # ===== Excel export constants =====
 
+
+
 COMMANDER_EXCEL_OUTPUT_PATH = "output/excel/"
 
 SHEET_NAME_QUANTITATIVE = "Quantitative"
@@ -145,11 +180,22 @@ SHEET_NAME_TEXTUAL = "Textual"
 OPTIONS_PER_QUESTION = 5
 OPTION_BLOCK_WIDTH = 3
 
+
 QUANT_HEADER_LABEL_COMMANDER = "Commander"
 QUANT_HEADER_LABEL_NUM_RESPONDENTS = "Number of respondents"
 QUANT_HEADER_LABEL_AVG_GENERAL = "General question – commander average"
 QUANT_HEADER_LABEL_STD_GENERAL = "General question – commander std"
 QUANT_HEADER_LABEL_COHORT_GENERAL = "General question – cohort average"
+
+QUANT_HEADER_ROWS = [
+    ("meta",        QUANT_HEADER_LABEL_COMMANDER,        "commander_name"),
+    ("meta",        QUANT_HEADER_LABEL_NUM_RESPONDENTS,  "num_answers"),
+    ("placeholder", QUANT_HEADER_LABEL_AVG_GENERAL,      "average_general"),
+    ("placeholder", QUANT_HEADER_LABEL_STD_GENERAL,      "std_general"),
+    ("placeholder", QUANT_HEADER_LABEL_COHORT_GENERAL,   "total_general"),
+]
+
+
 
 QUANT_COLUMN_QUESTION = "Question"
 

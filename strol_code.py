@@ -86,7 +86,7 @@ def compute_commander_general_stats(df_filtered: pd.DataFrame) -> Dict:
     Computes per-commander stats for:
         'עד כמה הייתי רוצה להיות תחת פיקודו בעתיד?'
     """
-    col = "עד כמה הייתי רוצה להיות תחת פיקודו בעתיד?"
+    col = GENERAL_QUESTION_COLUMN
 
     raw = df_filtered[col]
 
@@ -117,35 +117,31 @@ def compute_commander_general_stats(df_filtered: pd.DataFrame) -> Dict:
     return stats
 
 
-def add_general_question_stats(df_all: pd.DataFrame,
-                               df_filtered: pd.DataFrame,
-                               placeholder_to_value: Dict):
-
+def add_general_question_comander(df_filtered: pd.DataFrame,
+                                  placeholder_to_value: Dict):
     commander_stats = compute_commander_general_stats(df_filtered)
-    mahzor_avg = compute_mahzor_general_average(df_all)
     placeholder_to_value.update(commander_stats)
-    placeholder_to_value["total_general"] = mahzor_avg
 
 
+def add_general_question_mahzor(df_all: pd.DataFrame,
+                               mahzor_averages: Dict):
+    mahzor_avg = compute_mahzor_general_average(df_all)
+    mahzor_averages["total_general"] = mahzor_avg
 
-
-def calculations_on_seperated_data(df: pd.DataFrame, commander):
+def calculations_on_seperated_data(df_comander: pd.DataFrame, commander):
     placeholder_to_value = {}
-
-    df_filtered = df[df[COMMANDER_COLUMN] == commander]
-
     for option in OPTIONS:
         if option != NONE_OF_THE_ABOVE_OPTION:
-            count = count_occurrences(df_filtered, option)
+            count = count_occurrences(df_comander, option)
             percent_ph, _ = OPTIONS_TO_PLACEHOLDERS[option]  # split the tuple
-            placeholder_to_value[percent_ph] = compute_percent(count,len(df_filtered))
+            placeholder_to_value[percent_ph] = compute_percent(count,len(df_comander))
     # I handle it differently as it appears in all of the questions
-    handle_none_of_the_above(df_filtered, placeholder_to_value)
+    handle_none_of_the_above(df_comander, placeholder_to_value)
 
     for column in OPEN_QUESTIONS_COLUMNS:
-        placeholder_to_value[column] = [str(item) for item in df_filtered[column].dropna().tolist()]
+        placeholder_to_value[column] = [str(item) for item in df_comander[column].dropna().tolist()]
 
-    add_general_question_stats(df, df_filtered, placeholder_to_value)
+    add_general_question_comander(df_comander,placeholder_to_value)
 
     return placeholder_to_value
 
@@ -173,6 +169,7 @@ def calculate_total_percentage(df: pd.DataFrame):
         count = count_occurrences(df[col], NONE_OF_THE_ABOVE_OPTION)
         mahzor_averages[total_ph] = compute_percent(count,len(df))
 
+    add_general_question_mahzor(df,mahzor_averages)
     return mahzor_averages
 
 
@@ -347,6 +344,82 @@ def add_bullet_lists(doc: DocxTemplate, df_commander: pd.DataFrame, commander: s
 
 
 # ==== Excel export
+def build_quantitative_header_block(
+    df_commander: pd.DataFrame,
+    placeholder_to_value: Dict
+) -> list[list]:
+    commander_name = df_commander[COMMANDER_COLUMN].iloc[0]
+    num_answers = len(df_commander)
+
+    meta_values = {
+        "commander_name": commander_name,
+        "num_answers": num_answers,
+    }
+
+    rows: list[list] = []
+    for row_type, label, key in QUANT_HEADER_ROWS:
+        if row_type == "meta":
+            value = meta_values.get(key, "")
+        else:
+            value = placeholder_to_value.get(key, "")
+        rows.append([label, value])
+
+    return rows
+
+
+def build_quantitative_table_header() -> list[str]:
+    header: list[str] = [QUANT_COLUMN_QUESTION]
+
+    for i in range(OPTIONS_PER_QUESTION):
+        index = i + 1
+        header.extend([
+            f"{QUANT_SUBHEADER_STATEMENT} {index}",
+            f"{QUANT_SUBHEADER_COMMANDER_PERCENT} {index}",
+            f"{QUANT_SUBHEADER_COHORT_PERCENT} {index}",
+        ])
+
+    return header
+
+
+def build_quantitative_question_row(
+    question_index: int,
+    question: str,
+    placeholder_to_value: Dict,
+    mahzor_averages: Dict
+) -> list[str]:
+    total_columns = 1 + OPTIONS_PER_QUESTION * OPTION_BLOCK_WIDTH
+    row: list[str] = [""] * total_columns
+
+
+    row[0] = question
+
+
+    options_for_question = QUESTION_TO_OPTIONS.get(question, [])
+
+    if len(options_for_question) != OPTIONS_PER_QUESTION:
+        raise ValueError(
+            f"Question '{question}' has {len(options_for_question)} options, "
+            f"expected {OPTIONS_PER_QUESTION}."
+        )
+
+    for option_offset, option_text in enumerate(options_for_question):
+        base_col = 1 + option_offset * OPTION_BLOCK_WIDTH
+        row[base_col] = option_text
+        if option_text == NONE_OF_THE_ABOVE_OPTION:
+            option_key = f"{NONE_OF_THE_ABOVE_OPTION}_{question_index}"
+        else:
+            option_key = option_text
+
+        percent_placeholder, total_placeholder = OPTIONS_TO_PLACEHOLDERS[option_key]
+
+        commander_percent = placeholder_to_value.get(percent_placeholder, "")
+        cohort_percent = mahzor_averages.get(total_placeholder, "")
+
+        row[base_col + 1] = commander_percent
+        row[base_col + 2] = cohort_percent
+
+    return row
+
 
 def build_quantitative_sheet(
     df_commander: pd.DataFrame,
@@ -354,109 +427,29 @@ def build_quantitative_sheet(
     mahzor_averages: Dict
 ) -> pd.DataFrame:
     rows: list[list] = []
-
-    commander_name = df_commander[COMMANDER_COLUMN].iloc[0]
-    num_answers = len(df_commander)
-
-    average_general = placeholder_to_value.get("average_general", "")
-    std_general = placeholder_to_value.get("std_general", "")
-    total_general = placeholder_to_value.get("total_general", "")
-
-    # Top info block
-    rows.append([QUANT_HEADER_LABEL_COMMANDER, commander_name])
-    rows.append([QUANT_HEADER_LABEL_NUM_RESPONDENTS, num_answers])
-    rows.append([QUANT_HEADER_LABEL_AVG_GENERAL, average_general])
-    rows.append([QUANT_HEADER_LABEL_STD_GENERAL, std_general])
-    rows.append([QUANT_HEADER_LABEL_COHORT_GENERAL, total_general])
-    rows.append([])  # separator row
-
-    # Table header row
-    header: list[str] = [QUANT_COLUMN_QUESTION]
-    for i in range(OPTIONS_PER_QUESTION):
-        header.extend([
-            f"{QUANT_SUBHEADER_STATEMENT} {i + 1}",
-            f"{QUANT_SUBHEADER_COMMANDER_PERCENT} {i + 1}",
-            f"{QUANT_SUBHEADER_COHORT_PERCENT} {i + 1}",
-        ])
-    rows.append(header)
-
+    rows.extend(build_quantitative_header_block(df_commander, placeholder_to_value))
+    rows.append([])
+    rows.append(build_quantitative_table_header())
     total_columns = 1 + OPTIONS_PER_QUESTION * OPTION_BLOCK_WIDTH
+    empty_row = [""] * total_columns
 
-    def make_empty_row() -> list:
-        return [""] * total_columns
-
-    # One row per question, options spread across columns
+    # One row per question, with a blank row between questions
     for question_index, question in enumerate(MULTIPLE_CHOICE_COLUMNS):
-        row = make_empty_row()
-        row[0] = question
-
-        start = question_index * OPTIONS_PER_QUESTION
-        end = start + OPTIONS_PER_QUESTION
-        options_for_question = OPTIONS[start:end]
-
-        for option_offset, option_text in enumerate(options_for_question):
-            base_col = 1 + option_offset * OPTION_BLOCK_WIDTH
-
-            row[base_col] = option_text
-
-            if option_text == NONE_OF_THE_ABOVE_OPTION:
-                option_key = f"{NONE_OF_THE_ABOVE_OPTION}_{question_index}"
-            else:
-                option_key = option_text
-
-            percent_placeholder, total_placeholder = OPTIONS_TO_PLACEHOLDERS[option_key]
-
-            commander_percent = placeholder_to_value.get(percent_placeholder, "")
-            cohort_percent = mahzor_averages.get(total_placeholder, "")
-
-            row[base_col + 1] = commander_percent
-            row[base_col + 2] = cohort_percent
-
+        row = build_quantitative_question_row(
+            question_index=question_index,
+            question=question,
+            placeholder_to_value=placeholder_to_value,
+            mahzor_averages=mahzor_averages,
+        )
         rows.append(row)
-        rows.append(make_empty_row())  # blank row between questions
+        rows.append(empty_row)
 
     df_quantitative = pd.DataFrame(rows)
     return df_quantitative
 
 
-    def make_empty_row() -> list:
-        return [""] * total_columns
-
-    # For each question, fill rows with its options
-    for question_index, question in enumerate(MULTIPLE_CHOICE_COLUMNS):
-        start = question_index * OPTIONS_PER_QUESTION
-        end = start + OPTIONS_PER_QUESTION
-        options_for_question = OPTIONS[start:end]
-
-        for option_text in options_for_question:
-            row = make_empty_row()
-            base_col = question_index * QUESTION_BLOCK_WIDTH
-
-            # Statement text
-            row[base_col] = option_text
-
-            # Determine mapping key for this option
-            if option_text == NONE_OF_THE_ABOVE_OPTION:
-                option_key = f"{NONE_OF_THE_ABOVE_OPTION}_{question_index}"
-            else:
-                option_key = option_text
-
-            percent_placeholder, total_placeholder = OPTIONS_TO_PLACEHOLDERS[option_key]
-
-            commander_percent = placeholder_to_value.get(percent_placeholder, "")
-            cohort_percent = mahzor_averages.get(total_placeholder, "")
-
-            row[base_col + 1] = commander_percent
-            row[base_col + 2] = cohort_percent
-
-            rows.append(row)
-
-    df_quantitative = pd.DataFrame(rows)
-    return df_quantitative
-
-def build_textual_sheet(df_commander: pd.DataFrame) -> pd.DataFrame:
+def collect_text_answers(df_commander: pd.DataFrame) -> Dict[str, list[str]]:
     column_to_answers: Dict[str, list[str]] = {}
-    max_len = 0
 
     for question in OPEN_QUESTIONS_COLUMNS:
         if question in df_commander.columns:
@@ -472,16 +465,24 @@ def build_textual_sheet(df_commander: pd.DataFrame) -> pd.DataFrame:
             answers = []
 
         column_to_answers[question] = answers
-        if len(answers) > max_len:
-            max_len = len(answers)
+
+    return column_to_answers
+
+
+def build_textual_sheet(df_commander: pd.DataFrame) -> pd.DataFrame:
+    column_to_answers = collect_text_answers(df_commander)
+
+    max_len = max((len(lst) for lst in column_to_answers.values()), default=0)
 
     data: Dict[str, list[str]] = {}
+
     for question, answers in column_to_answers.items():
         padded = answers + [""] * (max_len - len(answers))
         data[question] = padded
 
     df_textual = pd.DataFrame(data)
     return df_textual
+
 
 def export_commander_excel(
     df_commander: pd.DataFrame,
@@ -491,7 +492,6 @@ def export_commander_excel(
     base_path: Optional[str] = None
 ) -> None:
     output_base = base_path if base_path is not None else COMMANDER_EXCEL_OUTPUT_PATH
-
     os.makedirs(output_base, exist_ok=True)
 
     excel_path = os.path.join(output_base, f"{commander}.xlsx")
@@ -509,18 +509,15 @@ def export_commander_excel(
             writer,
             sheet_name=SHEET_NAME_QUANTITATIVE,
             index=False,
-            header=False
+            header=False,
         )
         df_textual.to_excel(
             writer,
             sheet_name=SHEET_NAME_TEXTUAL,
-            index=False
+            index=False,
         )
 
     print(f"Excel for commander {commander} written to: {excel_path}")
-
-
-
 
 def main(file_path=INPUT_PATH):
     if not validate_excel():
@@ -536,7 +533,7 @@ def main(file_path=INPUT_PATH):
 
     for commander in df[COMMANDER_COLUMN].unique():
         df_commander = df[df[COMMANDER_COLUMN] == commander]
-        placeholder_to_value = calculations_on_seperated_data(df, commander)
+        placeholder_to_value = calculations_on_seperated_data(df_commander, commander)
         # merge with mahzor averages
         placeholder_to_value.update(mahzor_averages)
 
@@ -545,7 +542,6 @@ def main(file_path=INPUT_PATH):
             return
 
         generate_and_fill_commander_docx(df, placeholder_to_value, commander)
-
         export_commander_excel(
             df_commander=df_commander,
             commander=commander,
