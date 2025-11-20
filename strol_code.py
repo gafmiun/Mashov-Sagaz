@@ -33,8 +33,6 @@ def validate_excel(file_path=INPUT_PATH) -> bool:
     if df.empty:
         print("❌ Excel file is empty.")
         return False
-
-    # Empty cells are allowed
     return True
 
 
@@ -44,7 +42,7 @@ def excel_to_dataframe(file_path=INPUT_PATH):
 
 def format_number(x: float):
     """
-    If x is an integer
+    If x is an integer return
     Otherwise return rounded float with decimals
     """
     if x is None:
@@ -81,14 +79,14 @@ def compute_mahzor_general_average(df: pd.DataFrame) -> float:
 
     return round(float(series.mean()), 2)
 
-def compute_commander_general_stats(df_filtered: pd.DataFrame) -> Dict:
+def compute_commander_general_stats(df_commander: pd.DataFrame) -> Dict:
     """
     Computes per-commander stats for:
         'עד כמה הייתי רוצה להיות תחת פיקודו בעתיד?'
     """
     col = GENERAL_QUESTION_COLUMN
 
-    raw = df_filtered[col]
+    raw = df_commander[col]
 
     # Treat empty/whitespace as missing
     cleaned = raw.replace(r'^\s*$', pd.NA, regex=True)
