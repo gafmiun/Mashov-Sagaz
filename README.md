@@ -1,24 +1,57 @@
-# Mashov-Sagaz
+flow and key functions:
 
-this is the MASHOV SAGAZ project
+1) Load & Validate Data
 
-the code fits the template created in october 2025.
+excel_to_dataframe() – loads the Excel file into a DataFrame.
 
-the general flow of the code is:
+validate_excel() – checks that all expected columns exist and removes irrelevan
 
-1) data collection from the excel of replies to the google forms. note that the code assumes that all the questions are mandatory.
 
-2) data preprocessing (taking only the relevant), cleaning (removing invalid entries), and transforming (encoding categorical variables, normalizing numerical variables).
+2) Calculate Statistics
+Per-Commander:
 
-3) filling the word template with the processed data.
+calculations_on_seperated_data() – core function computing all commander-specific stats.
 
-THINGS TO DO:
-1) currently, the code for the filling of the verbal points is done using a different package than the rest of the
-Document generation. this causes the doc generation to work for either the table or the verbal points, but not both at
- the same time.
+count_occurrences() – counts how many respondents selected each option.
 
-2) deal with the last table, which is currently not handled at all!!
+compute_percent() – converts counts to percentages.
 
-3) make sure that the points and bullets are all filled, and not just the first one i checked.
+compute_commander_general_stats() – computes average & std of the general rating.
 
-4) generally, make sure it all works. TEST!
+Cohort-Level:
+
+calculate_total_percentage() – computes cohort-wide percentages for each option.
+
+add_general_question_mahzor() – adds overall cohort average for the general question.
+
+
+3) Build Context for Word Report
+build_basic_info_context() – commander name + number of respondents.
+
+build_bullet_lists_context() – extracts and cleans all open-text comments.
+
+merge_bullet_lists() – merges all context needed for templating.
+
+
+4) Generate Word Report
+
+replace_placeholders() – fills the Word template with commander statistics.
+
+add_bullet_lists() – renders structured bullet lists inside the Word file.
+
+
+5) Generate Excel Outputs
+Sheet 1 – Quantitative:
+
+build_quantitative_header_block() – header with commander info and general ratings.
+
+build_quantitative_table_header() – dynamic option headers.
+
+build_quantitative_question_row() – builds each question’s option rows.
+
+Sheet 2 – Textual:
+
+collect_text_answers() – collects written feedback per question.
+
+build_textual_sheet() – organizes text answers into equal-length columns.
+
