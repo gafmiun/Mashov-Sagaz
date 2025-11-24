@@ -88,10 +88,8 @@ def compute_commander_general_stats(df_commander: pd.DataFrame) -> Dict:
 
     raw = df_commander[col]
 
-    # Treat empty/whitespace as missing
+    # Treat empty as missing
     cleaned = raw.replace(r'^\s*$', pd.NA, regex=True)
-
-    # Convert to numeric, invalid -> NaN, then drop NaN
     numeric = pd.to_numeric(cleaned, errors="coerce")
     series = numeric.dropna()
 
@@ -126,72 +124,91 @@ def add_general_question_mahzor(df_all: pd.DataFrame,
     mahzor_avg = compute_mahzor_general_average(df_all)
     mahzor_averages["total_general"] = mahzor_avg
 
-def calculations_on_seperated_data(df_commander: pd.DataFrame, commander):
-    placeholder_to_value = {}
-    for option in OPTIONS:
-        if option != NONE_OF_THE_ABOVE_OPTION:
-            count = count_occurrences(df_commander, option)
-            percent_ph, _ = OPTIONS_TO_PLACEHOLDERS[option]  # split the tuple
-            placeholder_to_value[percent_ph] = compute_percent(count, len(df_commander))
-    # I handle it differently as it appears in all of the questions
-    handle_none_of_the_above(df_commander, placeholder_to_value)
 
-    for column in OPEN_QUESTIONS_COLUMNS:
-        placeholder_to_value[column] = [str(item) for item in df_commander[column].dropna().tolist()]
+def count_option_in_question(
+    df: pd.DataFrame,
+    question_column: str,
+    option_text: str,
+) -> int:
+    """
+    Count how many rows in the given question column contain this option_text.
+    Only scans that single column, not the whole DataFrame.
+    """
+    if question_column not in df.columns:
+        return 0
 
+    series = df[question_column].dropna().astype(str)
+
+    count = 0
+    for cell in series:
+        text = cell.strip()
+        if option_text in text:
+            count += 1
+
+    return count
+
+def calculations_on_seperated_data(df_commander: pd.DataFrame, commander: str) -> Dict:
+    placeholder_to_value: Dict = {}
+    total_responses = len(df_commander)
+    for question_index, (question, options_for_question) in enumerate(QUESTION_TO_OPTIONS.items()):
+        if question not in df_commander.columns:
+            continue
+
+        for option_text in options_for_question:
+            if option_text == NONE_OF_THE_ABOVE_OPTION:
+                option_key = f"{NONE_OF_THE_ABOVE_OPTION}_{question_index}"
+            else:
+                option_key = option_text
+
+            percent_placeholder, _ = OPTIONS_TO_PLACEHOLDERS[option_key]
+
+            count = count_option_in_question(
+                df=df_commander,
+                question_column=question,
+                option_text=option_text,
+            )
+
+            placeholder_to_value[percent_placeholder] = compute_percent(
+                count,
+                total_responses,
+            )
     add_general_question_commander(df_commander, placeholder_to_value)
 
     return placeholder_to_value
 
 
-def handle_none_of_the_above(df_filtered: pd.DataFrame, placeholder_to_value: Dict):
-    for index, col in enumerate(MULTIPLE_CHOICE_COLUMNS):
-        count = count_occurrences(df_filtered[col], NONE_OF_THE_ABOVE_OPTION)
-        percent_ph, _ = OPTIONS_TO_PLACEHOLDERS[NONE_OF_THE_ABOVE_OPTION + f"_{index}"]
-        placeholder_to_value[percent_ph] = compute_percent(count,len(df_filtered))
+    return placeholder_to_value
 
 
+def calculate_total_percentage(df: pd.DataFrame) -> Dict:
+    mahzor_averages: Dict = {}
+    total_responses = len(df)
 
-def calculate_total_percentage(df: pd.DataFrame):
-    mahzor_averages = {}
-
-    for option in OPTIONS:
-        if option != NONE_OF_THE_ABOVE_OPTION:
-            _, total_ph = OPTIONS_TO_PLACEHOLDERS[option]  # split the tuple
-            count = count_occurrences(df, option)
-            mahzor_averages[total_ph] = compute_percent(count,len(df))
-
-    # "none of the above" per question
-    for index, col in enumerate(MULTIPLE_CHOICE_COLUMNS):
-        _, total_ph = OPTIONS_TO_PLACEHOLDERS[NONE_OF_THE_ABOVE_OPTION + f"_{index}"]
-        count = count_occurrences(df[col], NONE_OF_THE_ABOVE_OPTION)
-        mahzor_averages[total_ph] = compute_percent(count,len(df))
-
-    add_general_question_mahzor(df,mahzor_averages)
-    return mahzor_averages
-
-
-
-def count_occurrences(data: Union[pd.DataFrame, pd.Series], target: str) -> int:
-
-    if isinstance(data, pd.DataFrame):
-        iterator = (cell for col in data.columns for cell in data[col])
-    elif isinstance(data, pd.Series):
-        iterator = iter(data)
-    else:
-        raise TypeError("data must be a pandas DataFrame or Series")
-
-    count = 0
-    for cell in iterator:
-        if not isinstance(cell, str):
+    for question_index, (question, options_for_question) in enumerate(QUESTION_TO_OPTIONS.items()):
+        if question not in df.columns:
             continue
 
-        text = cell.strip()
+        for option_text in options_for_question:
+            if option_text == NONE_OF_THE_ABOVE_OPTION:
+                option_key = f"{NONE_OF_THE_ABOVE_OPTION}_{question_index}"
+            else:
+                option_key = option_text
 
-        if target in text:
-            count += 1
+            _, total_placeholder = OPTIONS_TO_PLACEHOLDERS[option_key]
 
-    return count
+            count = count_option_in_question(
+                df=df,
+                question_column=question,
+                option_text=option_text,
+            )
+
+            mahzor_averages[total_placeholder] = compute_percent(
+                count,
+                total_responses,
+            )
+
+    add_general_question_mahzor(df, mahzor_averages)
+    return mahzor_averages
 
 
 def validate_calculations(placeholder_to_value: Dict):
