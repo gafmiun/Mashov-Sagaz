@@ -102,11 +102,12 @@ def compute_commander_general_stats(df_commander: pd.DataFrame) -> Dict:
     # Convert to numeric, invalid -> NaN, then drop NaN
     numeric = pd.to_numeric(cleaned, errors="coerce")
     series = numeric.dropna()
-
+    # CR: extract the common logic of compute_mahzor_general_average and compute_commander_general_stats
     n_valid = len(series)
 
     stats = {}
     if n_valid < MIN_GENERAL_ANSWERS:
+        # CR: const these stat names and any other dict key
         stats["average_general"] = TOO_FEW_ANSWERS_TEXT
         stats["std_general"] = TOO_FEW_ANSWERS_TEXT
         return stats
@@ -117,7 +118,7 @@ def compute_commander_general_stats(df_commander: pd.DataFrame) -> Dict:
     if pd.isna(std_val):
         std_val = DEFAULT_ZERO_VALUE
 
-    stats["average_general"] = round(float(mean_val), 2)
+    stats["average_general"] = round(float(mean_val), 2) # CR: don't you have a method for this rounding? You repeat it a lot
     stats["std_general"] = round(float(std_val), 2)
 
     return stats
@@ -134,9 +135,11 @@ def add_general_question_mahzor(df_all: pd.DataFrame,
     mahzor_avg = compute_mahzor_general_average(df_all)
     mahzor_averages["total_general"] = mahzor_avg
 
+# CR: This is a bad function signature. I don't understand what it does
 def calculations_on_seperated_data(df_commander: pd.DataFrame, commander):
     placeholder_to_value = {}
     for option in OPTIONS:
+        # CR: Invert if
         if option != NONE_OF_THE_ABOVE_OPTION:
             count = count_occurrences(df_commander, option)
             percent_ph, _ = OPTIONS_TO_PLACEHOLDERS[option]  # split the tuple
