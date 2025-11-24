@@ -1,3 +1,4 @@
+# CR: ["Timestamp", COMMANDER_COLUMN, ...] - only magic once. 
 COLUMNS = ["Timestamp", "שם המפקד:",
            "מה נכון בפיקוד?", "נקודות חיוביות פיקוד:", "נקודות שליליות פיקוד:",
            "מה נכון בנוכחות ומעורבות?", "נקודות חיוביות נוכחות:", "נקודות שליליות נוכחות:",
@@ -39,6 +40,22 @@ PLACEHOLDERS = [
 
                 ]
 
+"""
+CR: Again only magic once. We run the risk of chaning a string in one without in the other, messing up the code
+Two options:
+1) 
+DECISIVE = "<HEBREW_TEXT>"
+MOTIVATING = "<HEBREW_TEXT>"
+
+OPTIONS = [DECISIVE, MOTIVATING ...]
+OPTIONS_TO_PLACEHOLDERS = {DECISIVE: ..., MOTIVATING: ..., ...}
+
+2)
+OPTIONS_TO_PLACEHOLDERS = {...}
+OPTIONS = OPTIONS_TO_PLACEHOLDERS.keys()
+
+2) is better because less code and we don't repeat the key list (what if I added to OPTIONS_TO_PLACEHOLDERS without adding to OPTIONS)
+"""
 OPTIONS = ["החלטי/ת, סמכותי/ת ובטוח/ה בעצמו/ה", "מעורר/ת בי מוטיבציה", "מהווה דוגמה אישית", "מייצג/ת בהתנהגותו/ה את ערכי התוכנית", "אף אחד מההיגדים אינו נכון בעיניי",
            "נוכח/ת במופעי ההכשרה באופן רציף", "מעורב/ת במתרחש בתוכנית", "נגיש/ה וזמינ/ה לשאלות", "עוקב/ת אחר מצבי בהכשרה", "אף אחד מההיגדים אינו נכון בעיניי",
            "מגלה אכפתיות כלפיי", "מכיר/ה אותי לעומק", "מתייחס/ת בנעימות ובכבוד", "אני מרגיש/ה שאני מסוגל/ת לשתף אותו", "אף אחד מההיגדים אינו נכון בעיניי",

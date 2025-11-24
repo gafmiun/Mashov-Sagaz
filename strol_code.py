@@ -18,6 +18,11 @@ from constants import *
 
 def validate_excel(file_path=INPUT_PATH) -> bool:
     try:
+        """
+        CR: you repeat the excel_to_dataframe twice - for validation and for the load afterwards.
+        Weird, may make things slower, and error-prone (the data you validate isn't the same df you eventually use).
+        Just move this outward and validate_excel(data_frame)
+        """
         df = excel_to_dataframe(file_path)
     except Exception as e:
         print(f"❌ Error reading Excel file: {e}")
@@ -45,9 +50,12 @@ def format_number(x: float):
     If x is an integer return
     Otherwise return rounded float with decimals
     """
+
+    # CR: This function description is redundant. Instead name the function better: round_decimals_for_preview(number: float)
     if x is None:
         return DEFAULT_ZERO_VALUE
 
+    # CR: But x is a float. Why?
     if float(x).is_integer():
         return int(x)
     rounded =  round(float(x), PERCENT_DECIMALS)
@@ -156,8 +164,11 @@ def calculate_total_percentage(df: pd.DataFrame):
     mahzor_averages = {}
 
     for option in OPTIONS:
+        # CR: invert if
         if option != NONE_OF_THE_ABOVE_OPTION:
             _, total_ph = OPTIONS_TO_PLACEHOLDERS[option]  # split the tuple
+            
+            # CR: isn't it always in the same column in the df?
             count = count_occurrences(df, option)
             mahzor_averages[total_ph] = compute_percent(count,len(df))
 

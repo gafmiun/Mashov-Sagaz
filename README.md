@@ -1,3 +1,5 @@
+# CR: This README is not very helpful. I don't need you to describe the functions - if you wrote them neatly then I'll understand everything from the signatures. What I do need is: an explaination what this code tries to accomplish (including description of the input and output and maybe a simplified version), how to run, known issues, etc.
+
 flow and key functions:
 
 1) Load & Validate Data
