@@ -135,7 +135,8 @@ def add_general_question_mahzor(df_all: pd.DataFrame,
     mahzor_avg = compute_mahzor_general_average(df_all)
     mahzor_averages["total_general"] = mahzor_avg
 
-# CR: This is a bad function signature. I don't understand what it does
+# CR: This is a bad function signature. I don't understand what it does. calculate_commander_percentage
+# CR: This function is extremely simillar to the calculate_total_percentage. It should really be simplified to use the same logic
 def calculations_on_seperated_data(df_commander: pd.DataFrame, commander):
     placeholder_to_value = {}
     for option in OPTIONS:
@@ -210,6 +211,7 @@ def count_occurrences(data: Union[pd.DataFrame, pd.Series], target: str) -> int:
 
 def validate_calculations(placeholder_to_value: Dict):
     # check if there is anything left empty
+    # CR: Just raise an exception when it doesn't match the validation
     if None in placeholder_to_value.values() or "" in placeholder_to_value.values():
         print("❌ Some placeholders have empty values.")
         return False
