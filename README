@@ -4,7 +4,7 @@ flow and key functions:
 
 excel_to_dataframe() – loads the Excel file into a DataFrame.
 
-validate_excel() – checks that all expected columns exist and removes irrelevan
+validate_excel() – checks that all expected columns exist and removes irrelevant
 
 
 2) Calculate Statistics

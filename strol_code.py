@@ -12,35 +12,59 @@ from typing import Optional
 
 from constants import *
 
+import re
 
 
 
-
-def validate_excel(file_path=INPUT_PATH) -> bool:
-    try:
-        df = excel_to_dataframe(file_path)
-    except Exception as e:
-        print(f"❌ Error reading Excel file: {e}")
-        return False
-
+def validate_excel(df: pd.DataFrame) -> bool:
     actual_columns = list(df.columns)
-    column_match = set(actual_columns) == set(COLUMNS)
+    actual_set = set(actual_columns)
+    expected_set = set(COLUMNS)
 
-    if not column_match:
-        print(f"❌ Column names do not match expected names.\nExpected: {COLUMNS}\nActual: {actual_columns}")
+    missing = expected_set - actual_set
+    extra = actual_set - expected_set
+
+    if missing:
+        print("❌ Missing required columns in Excel file.")
+        print(f"Required (expected): {sorted(expected_set)}")
+        print(f"Actual:               {sorted(actual_set)}")
+        print(f"Missing:              {sorted(missing)}")
         return False
+
+    if extra:
+        # Not an error – just for visibility when debugging
+        print("ℹ️ Warning: extra columns found in Excel (will be ignored by the code):")
+        print(f"{sorted(extra)}")
 
     if df.empty:
         print("❌ Excel file is empty.")
         return False
+
     return True
 
+
+
+
+def remove_parentheses_from_commander_name(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    df[column] = df[column].astype(str).apply(
+        lambda x: re.sub(r"\s*\(.*?\)", "", x).strip()
+    )
+    return df
+
+def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.dropna(how="all")
+    df = df.dropna(subset=[COMMANDER_COLUMN])
+
+    # מנקה סוגריים מכל העמודה "שם המפקד:"
+    df = remove_parentheses_from_commander_name(df, COMMANDER_COLUMN)
+
+    return df
 
 
 def excel_to_dataframe(file_path=INPUT_PATH):
     return pd.read_excel(file_path)
 
-def format_number(x: float):
+def rounded_number(x: float):
     """
     If x is an integer return
     Otherwise return rounded float with decimals
@@ -52,6 +76,7 @@ def format_number(x: float):
         return int(x)
     rounded =  round(float(x), PERCENT_DECIMALS)
     return rounded
+
 def compute_percent(count: int, total: int) -> float:
     """
     Returns count/total * 100, rounded to PERCENT_DECIMALS .
@@ -59,7 +84,7 @@ def compute_percent(count: int, total: int) -> float:
     if total <= 0:
         return DEFAULT_ZERO_VALUE
     value = (count / total) * 100
-    form_value = format_number(value)
+    form_value = rounded_number(value)
     return f"{form_value}%"
 
 def compute_mahzor_general_average(df: pd.DataFrame) -> float:
@@ -147,68 +172,62 @@ def count_option_in_question(
 
     return count
 
-def calculations_on_seperated_data(df_commander: pd.DataFrame, commander: str) -> Dict:
-    placeholder_to_value: Dict = {}
-    total_responses = len(df_commander)
-    for question_index, (question, options_for_question) in enumerate(QUESTION_TO_OPTIONS.items()):
-        if question not in df_commander.columns:
-            continue
+def get_placeholder_name_for_option(
+    question_index: int,
+    option_text: str,
+    placeholder_type_index: int,
+) -> str:
 
-        for option_text in options_for_question:
-            if option_text == NONE_OF_THE_ABOVE_OPTION:
-                option_key = f"{NONE_OF_THE_ABOVE_OPTION}_{question_index}"
-            else:
-                option_key = option_text
+    option_key = build_option_key(option_text, question_index)
+    placeholders_tuple = OPTIONS_TO_PLACEHOLDERS[option_key]
+    placeholder_name = placeholders_tuple[placeholder_type_index]
 
-            percent_placeholder, _ = OPTIONS_TO_PLACEHOLDERS[option_key]
-
-            count = count_option_in_question(
-                df=df_commander,
-                question_column=question,
-                option_text=option_text,
-            )
-
-            placeholder_to_value[percent_placeholder] = compute_percent(
-                count,
-                total_responses,
-            )
-    add_general_question_commander(df_commander, placeholder_to_value)
-
-    return placeholder_to_value
+    return placeholder_name
 
 
-    return placeholder_to_value
-
-
-def calculate_total_percentage(df: pd.DataFrame) -> Dict:
-    mahzor_averages: Dict = {}
+def compute_option_percentages_for_df(
+    df: pd.DataFrame,
+    placeholder_type_index: int,
+) -> Dict[str, str]:
+    results: Dict[str, str] = {}
     total_responses = len(df)
 
     for question_index, (question, options_for_question) in enumerate(QUESTION_TO_OPTIONS.items()):
         if question not in df.columns:
             continue
-
         for option_text in options_for_question:
-            if option_text == NONE_OF_THE_ABOVE_OPTION:
-                option_key = f"{NONE_OF_THE_ABOVE_OPTION}_{question_index}"
-            else:
-                option_key = option_text
-
-            _, total_placeholder = OPTIONS_TO_PLACEHOLDERS[option_key]
-
+            placeholder_name = get_placeholder_name_for_option(question_index,option_text,placeholder_type_index)
             count = count_option_in_question(
                 df=df,
                 question_column=question,
                 option_text=option_text,
             )
 
-            mahzor_averages[total_placeholder] = compute_percent(
+            results[placeholder_name] = compute_percent(
                 count,
                 total_responses,
             )
 
+    return results
+
+def compute_cohort_multiple_choice_percentages(df_commander: pd.DataFrame, commander: str) -> Dict:
+    placeholder_to_value = compute_option_percentages_for_df(
+        df=df_commander,
+        placeholder_type_index=PLACEHOLDER_TYPE_COMMANDER,)
+    add_general_question_commander(df_commander, placeholder_to_value)
+
+    return placeholder_to_value
+
+
+
+def calculate_total_percentage(df: pd.DataFrame) -> Dict:
+    mahzor_averages = compute_option_percentages_for_df(
+        df=df,
+        placeholder_type_index=PLACEHOLDER_TYPE_COHORT,)
     add_general_question_mahzor(df, mahzor_averages)
+
     return mahzor_averages
+
 
 
 def validate_calculations(placeholder_to_value: Dict):
@@ -535,20 +554,23 @@ def export_commander_excel(
     print(f"Excel for commander {commander} written to: {excel_path}")
 
 def main(file_path=INPUT_PATH):
-    if not validate_excel(file_path):
-        print("Excel file validation failed.")
+    try:
+        df = excel_to_dataframe(file_path)
+    except Exception as e:
+        print(f"❌ Error reading Excel file: {e}")
         return
 
-    df = excel_to_dataframe(file_path)
-    # clen up empty rows / rows without commander name
-    df = df.dropna(how="all")
-    df = df.dropna(subset=[COMMANDER_COLUMN])
+    if not validate_excel(df):
+        print("Excel validation failed.")
+        return
+
+    df = clean_dataframe(df)
 
     mahzor_averages = calculate_total_percentage(df)
 
     for commander in df[COMMANDER_COLUMN].unique():
         df_commander = df[df[COMMANDER_COLUMN] == commander]
-        placeholder_to_value = calculations_on_seperated_data(df_commander, commander)
+        placeholder_to_value = compute_cohort_multiple_choice_percentages(df_commander, commander)
         # merge with mahzor averages
         placeholder_to_value.update(mahzor_averages)
 
