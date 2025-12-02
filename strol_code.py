@@ -5,7 +5,7 @@ from docx import Document
 import docx.table
 import docx.text.paragraph
 from docx.shared import Inches, Pt, RGBColor
-from typing import Dict, Union
+from typing import Dict, Union, Any
 from docxtpl import DocxTemplate
 import os
 from typing import Optional
@@ -95,47 +95,49 @@ def compute_mahzor_general_average(df: pd.DataFrame) -> float:
     col = GENERAL_QUESTION_COLUMN
 
     raw = df[col]
-    cleaned = raw.replace(r'^\s*$', pd.NA, regex=True)
-    numeric = pd.to_numeric(cleaned, errors="coerce")
-    series = numeric.dropna()
+    series = clean_numeric_series(raw)
 
     if series.empty:
         return DEFAULT_ZERO_VALUE
 
     return round(float(series.mean()), 2)
 
-def compute_commander_general_stats(df_commander: pd.DataFrame) -> Dict:
-    """
-    Computes per-commander stats for:
-        'עד כמה הייתי רוצה להיות תחת פיקודו בעתיד?'
-    """
-    col = GENERAL_QUESTION_COLUMN
 
-    raw = df_commander[col]
 
-    # Treat empty as missing
-    cleaned = raw.replace(r'^\s*$', pd.NA, regex=True)
+def clean_numeric_series(series: pd.Series) -> pd.Series:
+    cleaned = series.replace(r'^\s*$', pd.NA, regex=True)
     numeric = pd.to_numeric(cleaned, errors="coerce")
-    series = numeric.dropna()
+    return numeric.dropna()
 
+
+def compute_mean_and_std(series: pd.Series) -> Dict[str, Any]:
+    series = clean_numeric_series(series)
     n_valid = len(series)
 
-    stats = {}
     if n_valid < MIN_GENERAL_ANSWERS:
-        stats["average_general"] = TOO_FEW_ANSWERS_TEXT
-        stats["std_general"] = TOO_FEW_ANSWERS_TEXT
-        return stats
+        return {
+            "n": n_valid,
+            "mean": TOO_FEW_ANSWERS_TEXT,
+            "std": TOO_FEW_ANSWERS_TEXT,
+        }
 
-    mean_val = series.mean()
+    mean_val = round(float(series.mean()), 2)
     std_val = series.std(ddof=1)
-
     if pd.isna(std_val):
         std_val = DEFAULT_ZERO_VALUE
+    std_val = round(float(std_val), 2)
 
-    stats["average_general"] = round(float(mean_val), 2)
-    stats["std_general"] = round(float(std_val), 2)
+    return {"n": n_valid, "mean": mean_val, "std": std_val}
 
-    return stats
+def compute_commander_general_stats(df_commander: pd.DataFrame) -> Dict[str, Any]:
+    series = df_commander[GENERAL_QUESTION_COLUMN]
+    stats = compute_mean_and_std(series)
+
+    return {
+        "average_general": stats["mean"],
+        "std_general": stats["std"],
+    }
+
 
 
 def add_general_question_commander(df_filtered: pd.DataFrame,
@@ -210,7 +212,7 @@ def compute_option_percentages_for_df(
 
     return results
 
-def compute_cohort_multiple_choice_percentages(df_commander: pd.DataFrame, commander: str) -> Dict:
+def calculate_commander_multiple_choice_percentages(df_commander: pd.DataFrame, commander: str) -> Dict:
     placeholder_to_value = compute_option_percentages_for_df(
         df=df_commander,
         placeholder_type_index=PLACEHOLDER_TYPE_COMMANDER,)
@@ -220,7 +222,7 @@ def compute_cohort_multiple_choice_percentages(df_commander: pd.DataFrame, comma
 
 
 
-def calculate_total_percentage(df: pd.DataFrame) -> Dict:
+def calculate_total_multiple_choice_percentage(df: pd.DataFrame) -> Dict:
     mahzor_averages = compute_option_percentages_for_df(
         df=df,
         placeholder_type_index=PLACEHOLDER_TYPE_COHORT,)
@@ -566,11 +568,11 @@ def main(file_path=INPUT_PATH):
 
     df = clean_dataframe(df)
 
-    mahzor_averages = calculate_total_percentage(df)
+    mahzor_averages = calculate_total_multiple_choice_percentage(df)
 
     for commander in df[COMMANDER_COLUMN].unique():
         df_commander = df[df[COMMANDER_COLUMN] == commander]
-        placeholder_to_value = compute_cohort_multiple_choice_percentages(df_commander, commander)
+        placeholder_to_value = calculate_commander_multiple_choice_percentages(df_commander, commander)
         # merge with mahzor averages
         placeholder_to_value.update(mahzor_averages)
 

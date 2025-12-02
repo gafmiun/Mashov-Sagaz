@@ -101,16 +101,15 @@ OPEN_TEXT_COLUMN_TO_BULLET_KEY: Dict[str, str] = {
     "פירוט:":                                      "general_comments",
 }
 
-# Old name kept for backwards compatibility (used in main code)
+
 OPEN_QUESTIONS_COLUMNS: List[str] = list(OPEN_TEXT_COLUMN_TO_BULLET_KEY.keys())
 
-# Context for bullet lists in Word template: bullet_key -> Excel column
+
 BULLET_LIST_CONTEXT: Dict[str, str] = {
     bullet_key: column_name
     for column_name, bullet_key in OPEN_TEXT_COLUMN_TO_BULLET_KEY.items()
 }
 
-# Kept as in original code (not currently used, but kept for API stability)
 OPEN_QUESTIONS_PLACEHOLDERS: Dict[str, str] = {}
 
 # ===============================
@@ -132,7 +131,7 @@ def _build_excel_columns() -> List[str]:
     columns.append(GENERAL_QUESTION_COLUMN)
     return columns
 
-# Old name used everywhere in the code
+
 COLUMNS: List[str] = _build_excel_columns()
 
 # ===============================
