@@ -79,6 +79,7 @@ OPTIONS: List[str] = [
 # ===============================
 
 # Excel column -> bullet-list key in Word template
+# General / free text
 OPEN_TEXT_COLUMN_TO_BULLET_KEY: Dict[str, str] = {
     # Command
     "מה הן החוזקות של מפקד/ת הצוות או החונכ/ת שלך בתחום הפיקוד?":   "conserve_command",
@@ -97,9 +98,10 @@ OPEN_TEXT_COLUMN_TO_BULLET_KEY: Dict[str, str] = {
     "מה הן החולשות של מפקד/ת הצוות או החונכ/ת שלך בתחום האתגור והפיתוח המקצועי?":   "improve_challenge",
 
     # General / free text
-    "נמק/י את הציון שבחרת, ואת הסיבות לבחירתך בו": "rating_explanation",
-    "פירוט:":                                      "general_comments",
+    "נמק/י את הציון שבחרת, ואת הסיבות לבחירתך בו": "general_comments",
+    "פירוט:":                                      "rating_explanation",
 }
+
 
 
 OPEN_QUESTIONS_COLUMNS: List[str] = list(OPEN_TEXT_COLUMN_TO_BULLET_KEY.keys())

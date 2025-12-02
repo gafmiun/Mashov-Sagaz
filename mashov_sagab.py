@@ -183,7 +183,8 @@ def _style_section_axes(
 
     ax.set_title(rtl_embed_graphic(section_label))
     ax.set_ylabel(rtl_embed_graphic("ממוצע"))
-
+    ax.set_ylim(0, 6)
+    ax.set_yticks(range(0, 7))
     short_labels = [SHORT_LABELS.get(label, label) for label in x_labels]
     display_labels = [rtl_embed_graphic(lbl) for lbl in short_labels]
 
@@ -271,14 +272,14 @@ def _plot_section_bars(
         width=bar_width,
         yerr=commander_stds,
         capsize=5,
-        label=rtl_embed_graphic("מפקד/ת"),
+        label=rtl_embed_graphic("ממוצע אישי"),
     )
 
     ax.bar(
         [x + bar_width / 2 for x in x_positions],
         cohort_means,
         width=bar_width,
-        label=rtl_embed_graphic("מחזור"),
+        label=rtl_embed_graphic("ממוצע סגל"),
         alpha=0.8,
     )
 
