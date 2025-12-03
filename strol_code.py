@@ -157,22 +157,35 @@ def count_option_in_question(
     question_column: str,
     option_text: str,
 ) -> int:
-    """
-    Count how many rows in the given question column contain this option_text.
-    Only scans that single column, not the whole DataFrame.
-    """
+
     if question_column not in df.columns:
         return 0
 
     series = df[question_column].dropna().astype(str)
+    options_for_question = QUESTION_TO_OPTIONS.get(question_column, [])
+    non_none_options = [
+        opt for opt in options_for_question
+        if opt != NONE_OF_THE_ABOVE_OPTION
+    ]
 
     count = 0
     for cell in series:
         text = cell.strip()
-        if option_text in text:
-            count += 1
+        if not text:
+            continue
+
+        if option_text == NONE_OF_THE_ABOVE_OPTION:
+            # Count "none of the above" ONLY if it is the only marked option
+            has_none = (NONE_OF_THE_ABOVE_OPTION in text)
+            has_other = any(opt in text for opt in non_none_options)
+            if has_none and not has_other:
+                count += 1
+        else:
+            if option_text in text:
+                count += 1
 
     return count
+
 
 def get_placeholder_name_for_option(
     question_index: int,
