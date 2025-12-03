@@ -18,6 +18,11 @@ from constants import *
 
 def validate_excel(file_path=INPUT_PATH) -> bool:
     try:
+        """
+        CR: you repeat the excel_to_dataframe twice - for validation and for the load afterwards.
+        Weird, may make things slower, and error-prone (the data you validate isn't the same df you eventually use).
+        Just move this outward and validate_excel(data_frame)
+        """
         df = excel_to_dataframe(file_path)
     except Exception as e:
         print(f"❌ Error reading Excel file: {e}")
@@ -45,9 +50,12 @@ def format_number(x: float):
     If x is an integer return
     Otherwise return rounded float with decimals
     """
+
+    # CR: This function description is redundant. Instead name the function better: round_decimals_for_preview(number: float)
     if x is None:
         return DEFAULT_ZERO_VALUE
 
+    # CR: But x is a float. Why?
     if float(x).is_integer():
         return int(x)
     rounded =  round(float(x), PERCENT_DECIMALS)
@@ -94,11 +102,12 @@ def compute_commander_general_stats(df_commander: pd.DataFrame) -> Dict:
     # Convert to numeric, invalid -> NaN, then drop NaN
     numeric = pd.to_numeric(cleaned, errors="coerce")
     series = numeric.dropna()
-
+    # CR: extract the common logic of compute_mahzor_general_average and compute_commander_general_stats
     n_valid = len(series)
 
     stats = {}
     if n_valid < MIN_GENERAL_ANSWERS:
+        # CR: const these stat names and any other dict key
         stats["average_general"] = TOO_FEW_ANSWERS_TEXT
         stats["std_general"] = TOO_FEW_ANSWERS_TEXT
         return stats
@@ -109,7 +118,7 @@ def compute_commander_general_stats(df_commander: pd.DataFrame) -> Dict:
     if pd.isna(std_val):
         std_val = DEFAULT_ZERO_VALUE
 
-    stats["average_general"] = round(float(mean_val), 2)
+    stats["average_general"] = round(float(mean_val), 2) # CR: don't you have a method for this rounding? You repeat it a lot
     stats["std_general"] = round(float(std_val), 2)
 
     return stats
@@ -126,9 +135,12 @@ def add_general_question_mahzor(df_all: pd.DataFrame,
     mahzor_avg = compute_mahzor_general_average(df_all)
     mahzor_averages["total_general"] = mahzor_avg
 
+# CR: This is a bad function signature. I don't understand what it does. calculate_commander_percentage
+# CR: This function is extremely simillar to the calculate_total_percentage. It should really be simplified to use the same logic
 def calculations_on_seperated_data(df_commander: pd.DataFrame, commander):
     placeholder_to_value = {}
     for option in OPTIONS:
+        # CR: Invert if
         if option != NONE_OF_THE_ABOVE_OPTION:
             count = count_occurrences(df_commander, option)
             percent_ph, _ = OPTIONS_TO_PLACEHOLDERS[option]  # split the tuple
@@ -156,8 +168,11 @@ def calculate_total_percentage(df: pd.DataFrame):
     mahzor_averages = {}
 
     for option in OPTIONS:
+        # CR: invert if
         if option != NONE_OF_THE_ABOVE_OPTION:
             _, total_ph = OPTIONS_TO_PLACEHOLDERS[option]  # split the tuple
+            
+            # CR: isn't it always in the same column in the df?
             count = count_occurrences(df, option)
             mahzor_averages[total_ph] = compute_percent(count,len(df))
 
@@ -196,6 +211,7 @@ def count_occurrences(data: Union[pd.DataFrame, pd.Series], target: str) -> int:
 
 def validate_calculations(placeholder_to_value: Dict):
     # check if there is anything left empty
+    # CR: Just raise an exception when it doesn't match the validation
     if None in placeholder_to_value.values() or "" in placeholder_to_value.values():
         print("❌ Some placeholders have empty values.")
         return False
