@@ -4,8 +4,8 @@ from typing import Dict, List, Tuple
 # File paths and basic configuration
 # =====================================
 
-INPUT_PATH: str = "answers_sagab.xlsx"
-TEMPLATE_PATH: str = "mashov_sagab_template.docx"
+INPUT_PATH: str = "answers_sagab2.xlsx"
+TEMPLATE_PATH: str = "mashov_sagab_template_talpiot.docx"
 OUTPUT_PATH: str = "output_sagab/"
 COMMANDER_EXCEL_OUTPUT_PATH: str = "output_sagab/excel/"
 
@@ -30,6 +30,8 @@ PUNCTUATION_CHARS: List[str] = [
     ",", ".", "\"", "\\", "-", ":", ";", "(", ")", "!", "?", "+", "/"
 ]
 
+
+
 # =====================================
 # Core survey schema
 # =====================================
@@ -37,7 +39,7 @@ PUNCTUATION_CHARS: List[str] = [
 COMMANDER_COLUMN: str = "ממלא/ת משוב על..."
 
 GENERAL_QUESTION_COLUMN: str = (
-    "עד כמה היית רוצה לניות תחת פיקודו/ה של המפקד/ת גם בעתיד? (0 משמעותו לא רלוונטי)"
+    "עד כמה היית רוצה להיות תחת פיקודו/ה של המפקד/ת גם בעתיד? (0 משמעותו לא רלוונטי)"
 )
 
 # =====================================
@@ -145,7 +147,6 @@ NUMERIC_QUESTION_TO_SECTION: Dict[str, str] = build_numeric_question_to_section(
 
 NUMERIC_PLACEHOLDER_SCOPE_COMMANDER: str = "commander"
 NUMERIC_PLACEHOLDER_SCOPE_COHORT: str = "cohort"
-
 NUMERIC_PH_MEAN_COMMANDER = "mean_commander"
 NUMERIC_PH_STD_COMMANDER = "std_commander"
 NUMERIC_PH_MEAN_COHORT = "mean_cohort"
@@ -175,22 +176,8 @@ NUMERIC_PLACEHOLDERS: Dict[str, Dict[str, str]] = build_numeric_placeholders()
 # =====================================
 
 OPEN_TEXT_COLUMN_TO_BULLET_KEY: Dict[str, str] = {
-    ":נקודות חוזק בתחום - חיבור מקצועי לתכני ההכשרה": "conserve_professional",
-    ":נקודות חולשה בתחום - חיבור מקצועי לתכני ההכשרה": "improve_professional",
-
-    ":נקודות חוזק בתחום - נוכחות ומעורבות": "conserve_personal",
-    ":נקודות חולשה בתחום - נוכחות ומעורבות": "improve_personal",
-
-    ":נקודות חוזק בתחום - התנהלות בינאישית": "conserve_interpersonal",
-    ":נקודות חולשה בתחום - התנהלות בינאישית": "improve_interpersonal",
-
-    ":נקודות חוזק בתחום - פיקודיות": "conserve_command",
-    ":נקודות חולשה בתחום - פיקודיות": "improve_command",
-
-    ":נקודות חוזק בתחום - פיתוח אישי ומקצועי": "conserve_development",
-    ":נקודות חולשה בתחום - פיתוח אישי ומקצועי": "improve_development",
-
-    "אנא נמק את בחירתך:": "general",
+    "הערות לשימור:":     "conserve",
+    "הערות לשיפור:":  "improve",
 }
 
 

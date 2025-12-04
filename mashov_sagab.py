@@ -183,8 +183,8 @@ def _style_section_axes(
 
     ax.set_title(rtl_embed_graphic(section_label))
     ax.set_ylabel(rtl_embed_graphic("ממוצע"))
-    ax.set_ylim(0, 6)
-    ax.set_yticks(range(0, 7))
+    ax.set_ylim(1, 6)
+    ax.set_yticks(range(1, 7))
     short_labels = [SHORT_LABELS.get(label, label) for label in x_labels]
     display_labels = [rtl_embed_graphic(lbl) for lbl in short_labels]
 

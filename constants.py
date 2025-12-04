@@ -244,7 +244,7 @@ OPTIONS_TO_PLACEHOLDERS: Dict[str, Tuple[str, str]] = _build_options_to_placehol
 MIN_GENERAL_ANSWERS: int = 4
 TOO_FEW_ANSWERS_TEXT: str = "ענו פחות מ-4"
 
-PERCENT_DECIMALS: int = 2
+PERCENT_DECIMALS: int = 1
 MIN_COMMENT_LENGTH: int = 2
 DEFAULT_ZERO_VALUE: float = 0.0
 
