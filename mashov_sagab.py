@@ -190,7 +190,7 @@ def _style_section_axes(
 
     ax.set_xticks(x_positions)
     ax.set_xticklabels(display_labels, ha="center")
-###
+####
     ax.set_xlim(-0.5, float(MAX_QUESTIONS_PER_SECTION - 0.5))
 
     ax.legend(
